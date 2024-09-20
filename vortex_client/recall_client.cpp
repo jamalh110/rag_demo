@@ -9,7 +9,7 @@ using namespace derecho::cascade;
 
 //TODO: change these to read from dfgs json
 #define EMBEDDING_DIM 960
-#define TOP_K 4
+#define TOP_K 5
 #define VORTEX_SUBGROUP_INDEX 0
 #define AGG_SUBGROUP_INDEX 0
 #define QUERY_FILENAME "query.csv"
@@ -358,9 +358,8 @@ bool run_recall_test(ServiceClientAPI& capi, int num_queries, int batch_size, st
           uint found = 0;
           for (const auto& result : results) {
                 total++;
-                int size = sizeof(groundtruth[query_index]) / sizeof(groundtruth[query_index][0]);
                std::string doc_index = get_doc_index_from_obj_path(result);
-               if(arr_contains(groundtruth[query_index].data(), size, doc_index)) {
+               if(arr_contains(groundtruth[query_index].data(), TOP_K, doc_index)) {
                     found++;
                }
                std::cout << get_doc_index_from_obj_path(result) << std::endl;
