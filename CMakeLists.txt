@@ -50,6 +50,14 @@ target_compile_definitions(latency_client PRIVATE
     ENABLE_VORTEX_EVALUATION_LOGGING=${ENABLE_VORTEX_EVALUATION_LOGGING}
 )
 
+add_executable(recall_client vortex_client/recall_client.cpp)
+target_link_libraries(recall_client cascade pthread)
+target_compile_definitions(recall_client PRIVATE
+    LOG_TAG_QUERIES_SENDING_START=${LOG_TAG_QUERIES_SENDING_START}
+    LOG_TAG_QUERIES_SENDING_END=${LOG_TAG_QUERIES_SENDING_END}
+    LOG_TAG_QUERIES_RESULT_CLIENT_RECEIVED=${LOG_TAG_QUERIES_RESULT_CLIENT_RECEIVED}
+    ENABLE_VORTEX_EVALUATION_LOGGING=${ENABLE_VORTEX_EVALUATION_LOGGING}
+)
 
 
 # Centroids_search UDL tags
@@ -221,6 +229,10 @@ add_custom_command(TARGET aggregate_generate_udl POST_BUILD
         ${CMAKE_CURRENT_BINARY_DIR}/cfg/n2/latency_client
     COMMAND ln -sf ${CMAKE_CURRENT_BINARY_DIR}/latency_client
         ${CMAKE_CURRENT_BINARY_DIR}/cfg/n3/latency_client
+    COMMAND ln -sf ${CMAKE_CURRENT_BINARY_DIR}/recall_client
+        ${CMAKE_CURRENT_BINARY_DIR}/cfg/n2/recall_client
+    COMMAND ln -sf ${CMAKE_CURRENT_BINARY_DIR}/recall_client
+        ${CMAKE_CURRENT_BINARY_DIR}/cfg/n3/recall_client
     COMMAND chmod 755 ${CMAKE_CURRENT_BINARY_DIR}/cfg/run.sh.tmp
     COMMAND chmod 755 ${CMAKE_CURRENT_BINARY_DIR}/cfg/clear_log.sh.tmp
     DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/cfg/run.sh.tmp

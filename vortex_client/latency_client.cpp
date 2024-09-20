@@ -111,10 +111,10 @@ bool deserialize_result(const Blob& blob, std::string& query_text, std::vector<s
           query_text = parsed_json["query"];
           top_k_docs = parsed_json["top_k_docs"];
 
-        std::cout << "Top K Docs:" << std::endl;
+                  std::cout << "Top K Docs:" << std::endl;
         for (const auto& doc : top_k_docs) {
             std::cout << doc << std::endl;
-     }
+}
 
      } catch (const nlohmann::json::parse_error& e) {
           std::cerr << "Result JSON parse error: " << e.what() << std::endl;

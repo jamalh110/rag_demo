@@ -6,15 +6,38 @@
 #include <vector>
 
 using namespace derecho::cascade;
+
+//TODO: change these to read from dfgs json
 #define EMBEDDING_DIM 960
+#define TOP_K 4
 #define VORTEX_SUBGROUP_INDEX 0
 #define AGG_SUBGROUP_INDEX 0
 #define QUERY_FILENAME "query.csv"
 #define QUERY_EMB_FILENAME "query_emb.csv"
+#define GROUNDTRUTH_FILENAME "groundtruth.csv"
 
 // Use vector since one query may be reuse for multiple times
 std::unordered_map<std::string, std::vector<std::tuple<int, int>>> sent_queries;
-std::unordered_map<std::string, std::string> query_results;
+std::unordered_map<std::string, std::vector<std::string>> query_results;
+
+std::string get_doc_index_from_obj_path(std::string obj_path) {
+     std::string doc_index = obj_path.substr(obj_path.find_last_of('/') + 1);
+     return doc_index;
+}
+
+uint get_query_num(std::string obj_path) {
+     std::string doc_index = obj_path.substr(obj_path.find_last_of(' ') + 1);
+     return stoi(doc_index);
+}
+
+bool arr_contains(const std::string arr[], int size, const std::string& value) {
+    for (int i = 0; i < size; ++i) {
+        if (arr[i] == value) {
+            return true; // Found the value
+        }
+    }
+    return false; // Not found
+}
 
 int read_queries(std::filesystem::path query_filepath, int num_queries, int batch_size, std::vector<std::string>& queries) {
      std::ifstream file(query_filepath);
@@ -75,6 +98,38 @@ int read_query_embs(std::string query_emb_directory, int num_queries, int batch_
 }
 
 
+std::vector<std::vector<std::string>> read_groundtruth(std::filesystem::path filename) {
+    std::vector<std::vector<std::string>> data;
+    std::ifstream file(filename);
+
+    if (!file.is_open()) {
+        std::cerr << "Error: Could not open file " << filename << std::endl;
+        return data;
+    }
+
+    std::string line;
+    // Read the file line by line
+    while (std::getline(file, line)) {
+        std::vector<std::string> row;
+        std::stringstream line_stream(line);
+        std::string cell;
+
+        // Split each line by commas
+        while (std::getline(line_stream, cell, ',')) {
+            row.push_back(cell);
+        }
+        data.push_back(row);
+    }
+
+    file.close();
+    for (auto& row : data) {
+        if (row.size() > TOP_K) {
+            row.resize(TOP_K); // Keep only the first k elements
+        }
+    }
+    return data;
+}
+
 std::string format_query_emb_object(int nq, std::unique_ptr<float[]>& xq, std::vector<std::string>& query_list) {
      // create an bytes object by concatenating: num_queries + float array of emebddings + list of query_text
      uint32_t num_queries = static_cast<uint32_t>(nq);
@@ -124,7 +179,7 @@ bool deserialize_result(const Blob& blob, std::string& query_text, std::vector<s
 }
 
 
-bool run_latency_test(ServiceClientAPI& capi, int num_queries, int batch_size, std::string& query_directory, int query_interval) {
+bool run_recall_test(ServiceClientAPI& capi, int num_queries, int batch_size, std::string& query_directory, int query_interval) {
      int my_id = capi.get_my_id();
      // 1.1. Prepare for the notification by creating object pool for results to store
      std::string result_pool_name = "/rag/results/" + std::to_string(my_id);
@@ -145,7 +200,7 @@ bool run_latency_test(ServiceClientAPI& capi, int num_queries, int batch_size, s
                          return false;
                     }
                     if (query_results.find(query_text) == query_results.end()) {
-                         query_results[query_text] = top_k_docs[0];
+                         query_results[query_text] = top_k_docs;
                     }
                     if (sent_queries.find(query_text) != sent_queries.end()) {
                          for (auto& [qb_id, q_id]: sent_queries[query_text]) {
@@ -287,6 +342,40 @@ bool run_latency_test(ServiceClientAPI& capi, int num_queries, int batch_size, s
      }
      std::cout << "Flushed logs to shards." << std::endl;
      TimestampLogger::flush("client_timestamp.dat");
+
+
+     std::cout << "Compare with groundtruth:" << std::endl;
+     std::filesystem::path groundtruth_pathname = std::filesystem::path(query_directory) / GROUNDTRUTH_FILENAME;
+     std::vector<std::vector<std::string>> groundtruth = read_groundtruth(groundtruth_pathname);
+
+     for (const auto& [query, results] : query_results) {
+        
+          std::cout << "Query: " << query << std::endl;
+          uint query_index = get_query_num(query);
+          std::cout << "Results:" << std::endl;
+
+          uint total = 0;
+          uint found = 0;
+          for (const auto& result : results) {
+                total++;
+                int size = sizeof(groundtruth[query_index]) / sizeof(groundtruth[query_index][0]);
+               std::string doc_index = get_doc_index_from_obj_path(result);
+               if(arr_contains(groundtruth[query_index].data(), size, doc_index)) {
+                    found++;
+               }
+               std::cout << get_doc_index_from_obj_path(result) << std::endl;
+          }
+          if (query_index < groundtruth.size()) {
+            std::cout << "Groundtruth:" << std::endl;
+            for (const auto& gt : groundtruth[query_index]) {
+                std::cout << gt << std::endl;
+            }
+        }
+          std::cout << "Recall: " << static_cast<double>(found) / total << std::endl;
+          std::cout << "------------------------" << std::endl;
+     }
+     //TODO: compare groundtruth with results
+
      return true;
 }
 
@@ -331,7 +420,7 @@ int main(int argc, char** argv){
      std::cout << "Batch size: " << batch_size << std::endl;
 
      auto& capi = ServiceClientAPI::get_service_client();
-     run_latency_test(capi, num_queries, batch_size, query_directory, query_interval);
+     run_recall_test(capi, num_queries, batch_size, query_directory, query_interval);
 
      return 0;
 }
