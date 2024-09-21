@@ -16,7 +16,7 @@ namespace cascade{
 
 #define MY_UUID     "11a3c123-3300-31ac-1866-0003ac330000"
 #define MY_DESC     "UDL to aggregate the knn search results for each query from the clusters and run LLM with the query and its top_k closest docs."
-#define SKIP_DOC_RETRIEVAL true
+#define SKIP_DOC_RETRIEVAL false
 
 std::string get_uuid() {
     return MY_UUID;
