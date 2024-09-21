@@ -190,8 +190,7 @@ class AggGenOCDPO: public DefaultOffCriticalDataPathObserver {
                                const ObjectWithStringKey& object,
                                const emit_func_t& emit,
                                DefaultCascadeContextType* typed_ctxt,
-                               uint32_t worker_id) override {
-        std::cout << "here0" << std::endl;      
+                               uint32_t worker_id) override { 
         // 0. parse the query information from the key_string
         int client_id, cluster_id, batch_id, qid;
         if (!parse_query_info(key_string, client_id, batch_id, cluster_id, qid)) {
@@ -228,7 +227,6 @@ class AggGenOCDPO: public DefaultOffCriticalDataPathObserver {
             dbg_default_error("Failed to add the cluster search result for query={} and cluster_id={}.", query_text, cluster_id);
             return;
         }
-        std::cout << "here1" << std::endl;
         if (!query_results[query_text]->is_all_results_collected()) {
 #ifdef ENABLE_VORTEX_EVALUATION_LOGGING
             TimestampLogger::log(LOG_TAG_AGG_UDL_END_NOT_FULLY_GATHERED, client_id, query_batch_id, cluster_id);
@@ -241,7 +239,8 @@ class AggGenOCDPO: public DefaultOffCriticalDataPathObserver {
         // 3. All cluster results are collected for this query, aggregate the top_k results
         auto& agg_top_k_results = query_results[query_text]->agg_top_k_results;
         // 4. get the top_k docs content
-        std::vector<std::string> top_k_docs;
+        std::vector<std::string> top_k_docs(top_k);
+        uint i = top_k - 1;
         while (!agg_top_k_results.empty()) {
             auto doc_index = agg_top_k_results.top();
             agg_top_k_results.pop();
@@ -252,11 +251,8 @@ class AggGenOCDPO: public DefaultOffCriticalDataPathObserver {
                 dbg_default_error("Failed to get_doc for cluster_id={} and emb_id={}.", doc_index.cluster_id, doc_index.emb_id);
                 return;
             }
-            std::cout << "Retrieved document: " << res_doc << std::endl;
-            top_k_docs.push_back(res_doc);
+            top_k_docs[i--] = res_doc;
         }
-        //return the docs in order from the closest to the farthest
-        std::reverse(top_k_docs.begin(), top_k_docs.end());
 #ifdef ENABLE_VORTEX_EVALUATION_LOGGING
         TimestampLogger::log(LOG_TAG_AGG_UDL_RETRIEVE_DOC_END, client_id, query_batch_id, qid);
 #endif
